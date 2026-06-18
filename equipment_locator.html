@@ -1,0 +1,883 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<title>Search — Saudi Energy</title>
+<style>
+  :root {
+    --extra-dark-blue: #00183A;
+    --dark-blue: #001F5E;
+    --blue: #0027B9;
+    --mid-blue: #0080FF;
+    --light-blue: #32C2FF;
+    --green: #00FF86;
+    --white: #FFFFFF;
+    --tert-red: #E10054;
+    --tert-orange: #EF9B00;
+    --tert-green: #00B476;
+
+    --bg: var(--dark-blue);
+    --bg-deep: var(--extra-dark-blue);
+    --ink: var(--white);
+    --ink-soft: rgba(255, 255, 255, 0.72);
+    --ink-faint: rgba(255, 255, 255, 0.45);
+    --line: rgba(255, 255, 255, 0.12);
+    --line-strong: rgba(255, 255, 255, 0.22);
+    --panel: rgba(255, 255, 255, 0.04);
+    --panel-bright: rgba(255, 255, 255, 0.07);
+
+    --grad-mb-g: linear-gradient(135deg, var(--mid-blue), var(--green));
+    --grad-mb-lb: linear-gradient(135deg, var(--mid-blue), var(--light-blue));
+    --grad-lb-g: linear-gradient(135deg, var(--light-blue), var(--green));
+    --grad-full: linear-gradient(135deg, var(--dark-blue) 0%, var(--blue) 35%, var(--mid-blue) 65%, var(--green) 100%);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: var(--ink); line-height: 1.5; }
+
+  /* === LOGIN GATE === */
+  .gate {
+    position: fixed; inset: 0; z-index: 1000;
+    display: grid; place-items: center;
+    padding: 24px;
+    background: var(--bg);
+    background-image:
+      radial-gradient(900px 600px at 50% 0%, rgba(0, 128, 255, 0.18), transparent 60%),
+      radial-gradient(700px 500px at 50% 100%, rgba(0, 255, 134, 0.10), transparent 60%);
+    transition: opacity 0.4s ease, visibility 0.4s;
+  }
+  .gate.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+  .gate-card {
+    width: 100%; max-width: 440px;
+    background: var(--panel-bright);
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    padding: 40px 32px;
+    backdrop-filter: blur(12px);
+    position: relative; overflow: hidden;
+  }
+  .gate-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 2px; background: var(--grad-full);
+  }
+  .gate-logo { width: 72px; height: 52px; margin: 0 auto 18px; display: block; }
+  .gate h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 6px; text-align: center; }
+  .gate p { font-size: 13px; color: var(--ink-soft); margin-bottom: 28px; text-align: center; }
+  .gate-field { margin-bottom: 12px; }
+  .gate-field label {
+    display: block;
+    font-size: 10px;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .gate input {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1.5px solid var(--line-strong);
+    border-radius: 12px;
+    padding: 14px 16px;
+    color: var(--ink);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 15px; font-weight: 500;
+    height: 50px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .gate input::placeholder { color: var(--ink-faint); }
+  .gate input:focus {
+    outline: none;
+    border-color: var(--light-blue);
+    box-shadow: 0 0 0 4px rgba(50, 194, 255, 0.18);
+  }
+  .gate input.error { border-color: var(--tert-red); box-shadow: 0 0 0 4px rgba(225, 0, 84, 0.15); }
+  .gate-input-wrap { position: relative; }
+  .toggle-pw {
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    background: none; border: none;
+    color: var(--ink-faint);
+    cursor: pointer; padding: 6px;
+    display: flex; align-items: center; justify-content: center;
+    transition: color 0.2s;
+  }
+  .toggle-pw:hover { color: var(--light-blue); }
+  .toggle-pw svg { width: 18px; height: 18px; }
+  .gate-btn {
+    width: 100%;
+    margin-top: 4px;
+    background: var(--grad-mb-g);
+    color: var(--dark-blue);
+    border: none; border-radius: 12px;
+    padding: 0 24px; height: 52px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 800; font-size: 14px;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: filter 0.2s, transform 0.1s;
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    box-shadow: 0 8px 24px -10px rgba(0, 255, 134, 0.45);
+  }
+  .gate-btn:hover:not(:disabled) { filter: brightness(1.08); }
+  .gate-btn:active:not(:disabled) { transform: translateY(1px); }
+  .gate-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .gate-btn .spinner {
+    width: 18px; height: 18px;
+    border: 2.5px solid rgba(0, 31, 94, 0.3);
+    border-top-color: var(--dark-blue);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .gate-msg { margin-top: 14px; font-size: 13px; min-height: 18px; color: var(--ink-faint); text-align: center; }
+  .gate-msg.error { color: var(--tert-red); font-weight: 600; }
+  .gate-msg.ok { color: var(--green); font-weight: 600; }
+  .shake { animation: shake 0.4s; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+  }
+
+  /* === TOP BAR === */
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(0, 24, 58, 0.92);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar-inner {
+    max-width: 1180px; margin: 0 auto;
+    padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .logo { width: 48px; height: 36px; flex-shrink: 0; }
+  .logo svg { width: 100%; height: 100%; display: block; }
+  .brand-text { line-height: 1.05; }
+  .brand-text .name { font-weight: 800; font-size: 15px; letter-spacing: -0.01em; }
+  .brand-text .sub {
+    font-size: 10px; color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: 0.16em; margin-top: 4px;
+    font-weight: 600;
+  }
+  .nav-links { display: flex; gap: 4px; }
+  .nav-link {
+    color: var(--ink-soft);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    transition: background 0.2s, color 0.2s;
+    white-space: nowrap;
+  }
+  .nav-link:hover { background: var(--panel); color: var(--ink); }
+  .nav-link.active {
+    background: rgba(50, 194, 255, 0.12);
+    color: var(--light-blue);
+    border: 1px solid rgba(50, 194, 255, 0.3);
+  }
+  .nav-link.admin-only { display: none; }
+  .nav-link.admin-only.visible { display: inline-block; }
+  .meta { display: flex; align-items: center; gap: 10px; }
+  .user-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 12px 6px 6px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    font-weight: 500;
+  }
+  .user-avatar {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--grad-mb-g);
+    color: var(--dark-blue);
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+  }
+  .user-role {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--light-blue);
+    font-weight: 700;
+    margin-left: 4px;
+  }
+  .user-role.admin { color: var(--green); }
+  .lock-btn {
+    background: none;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    color: var(--ink-soft);
+    padding: 6px 12px;
+    font-size: 11px; font-weight: 600;
+    cursor: pointer;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    transition: border-color 0.2s, color 0.2s;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .lock-btn:hover { border-color: var(--tert-red); color: var(--tert-red); }
+  .lock-btn svg { width: 12px; height: 12px; }
+
+  /* Hero */
+  .heartbeat-bg { position: fixed; inset: 0; z-index: 0; pointer-events: none; overflow: hidden; }
+  .heartbeat-bg svg { position: absolute; width: 200%; height: 100%; left: -50%; bottom: 0; opacity: 0.5; }
+  .heartbeat-bg::before {
+    content: ''; position: absolute; inset: 0;
+    background:
+      radial-gradient(800px 500px at 90% -10%, rgba(0, 128, 255, 0.25), transparent 60%),
+      radial-gradient(700px 600px at -10% 110%, rgba(0, 255, 134, 0.10), transparent 60%);
+  }
+  .heartbeat-bg::after {
+    content: ''; position: absolute; inset: 0;
+    background: linear-gradient(180deg, transparent 0%, transparent 60%, var(--bg-deep) 100%);
+  }
+  .app { display: none; position: relative; z-index: 1; }
+  .app.ready { display: block; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 56px 28px 80px; position: relative; z-index: 1; }
+
+  .hero {
+    display: grid;
+    grid-template-columns: 1.3fr 0.7fr;
+    gap: 40px;
+    align-items: end;
+    margin-bottom: 36px;
+  }
+  .hero h1 { font-size: clamp(36px, 5.5vw, 64px); font-weight: 800; letter-spacing: -0.035em; line-height: 1.0; }
+  .hero h1 .grad {
+    background: var(--grad-mb-g);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent; font-style: italic;
+  }
+  .hero p { color: var(--ink-soft); font-size: 15px; line-height: 1.6; margin-top: 18px; max-width: 520px; }
+  .stats { display: flex; gap: 16px; justify-content: flex-end; flex-wrap: wrap; }
+  .stat {
+    border: 1px solid var(--line);
+    background: var(--panel);
+    padding: 18px 22px;
+    border-radius: 14px;
+    min-width: 130px;
+    position: relative; overflow: hidden;
+  }
+  .stat::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; }
+  .stat.rmu::before { background: var(--grad-mb-lb); }
+  .stat.oh::before  { background: var(--grad-lb-g); }
+  .stat .num { font-size: 28px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
+  .stat.rmu .num { background: var(--grad-mb-lb); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .stat.oh .num  { background: var(--grad-lb-g);  -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .stat .lbl {
+    font-size: 11px; color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: 0.14em;
+    margin-top: 8px; font-weight: 600;
+  }
+
+  .search-card {
+    background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02));
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 28px;
+    margin-bottom: 28px;
+    position: relative; overflow: hidden;
+  }
+  .search-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 2px; background: var(--grad-full);
+  }
+  .search-label {
+    font-size: 11px; color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: 0.18em;
+    margin-bottom: 14px;
+    display: flex; align-items: center; gap: 10px;
+    font-weight: 700;
+  }
+  .search-label::before {
+    content: ''; width: 24px; height: 2px;
+    background: var(--grad-mb-g); border-radius: 2px;
+  }
+  .search-grid {
+    display: grid; grid-template-columns: 1.4fr 1fr auto; gap: 14px; align-items: end;
+  }
+  input[type="text"], select {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1.5px solid var(--line-strong);
+    border-radius: 12px;
+    padding: 16px 18px;
+    color: var(--ink);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 16px; font-weight: 500;
+    height: 56px; width: 100%;
+    transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+    appearance: none; -webkit-appearance: none;
+  }
+  input[type="text"]::placeholder { color: var(--ink-faint); }
+  input[type="text"]:focus, select:focus {
+    outline: none;
+    border-color: var(--light-blue);
+    box-shadow: 0 0 0 4px rgba(50, 194, 255, 0.18);
+    background: rgba(0, 0, 0, 0.35);
+  }
+  select {
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2332C2FF' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 18px center;
+    padding-right: 44px;
+  }
+  select option { background: var(--dark-blue); color: var(--ink); }
+
+  .btn {
+    background: var(--grad-mb-g);
+    color: var(--dark-blue);
+    border: none; border-radius: 12px;
+    padding: 0 32px; height: 56px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 800; font-size: 14px;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.25s, filter 0.2s;
+    display: inline-flex; align-items: center; gap: 10px;
+    white-space: nowrap;
+    box-shadow: 0 8px 24px -10px rgba(0, 255, 134, 0.45), 0 0 0 1px rgba(0, 255, 134, 0.2);
+  }
+  .btn:hover:not(:disabled) { filter: brightness(1.08); box-shadow: 0 12px 32px -8px rgba(0, 255, 134, 0.6), 0 0 0 1px rgba(0, 255, 134, 0.4); }
+  .btn:active { transform: translateY(1px); }
+  .btn:disabled { opacity: 0.7; cursor: wait; }
+  .btn svg { width: 18px; height: 18px; }
+  .btn .spinner { width: 16px; height: 16px; border: 2.5px solid rgba(0,31,94,0.3); border-top-color: var(--dark-blue); border-radius: 50%; animation: spin 0.7s linear infinite; }
+
+  .results { min-height: 80px; }
+  .result-card {
+    background: var(--panel-bright);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    overflow: hidden;
+    animation: slideIn 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+    backdrop-filter: blur(8px);
+  }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  .result-head {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 26px 28px; border-bottom: 1px solid var(--line);
+    gap: 18px; flex-wrap: wrap; position: relative;
+  }
+  .result-head::after {
+    content: ''; position: absolute;
+    left: 28px; right: 28px; bottom: -1px;
+    height: 1px; background: var(--grad-mb-g); opacity: 0.6;
+  }
+  .id-block .id-label { font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.16em; font-weight: 700; }
+  .id-block .id-num { font-size: 42px; font-weight: 800; margin-top: 6px; letter-spacing: -0.025em; line-height: 1; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 10px 16px; border-radius: 999px;
+    font-size: 12px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    border: 1.5px solid; white-space: nowrap;
+  }
+  .badge-rmu { color: var(--light-blue); border-color: rgba(50, 194, 255, 0.5); background: rgba(50, 194, 255, 0.1); }
+  .badge-oh  { color: var(--green);      border-color: rgba(0, 255, 134, 0.5); background: rgba(0, 255, 134, 0.1); }
+  .badge .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+
+  .grid-info { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1px; background: var(--line); }
+  .info-cell { background: var(--bg-deep); padding: 20px 28px; }
+  .info-cell .lbl { font-size: 11px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.16em; margin-bottom: 8px; font-weight: 700; }
+  .info-cell .val { font-size: 16px; color: var(--ink); font-weight: 600; word-break: break-word; }
+  .info-cell .val.coord { font-variant-numeric: tabular-nums; color: var(--light-blue); }
+
+  .map-row {
+    display: flex; gap: 12px; padding: 22px 28px;
+    background: linear-gradient(180deg, var(--bg-deep), rgba(0, 24, 58, 0.6));
+    border-top: 1px solid var(--line); flex-wrap: wrap;
+  }
+  .map-btn {
+    flex: 1; background: rgba(255, 255, 255, 0.04);
+    border: 1.5px solid var(--line-strong);
+    border-radius: 12px; padding: 16px 22px;
+    color: var(--ink); text-decoration: none;
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    font-weight: 700; font-size: 14px; letter-spacing: 0.02em;
+    transition: border-color 0.2s, transform 0.1s, background 0.2s;
+    min-width: 200px;
+  }
+  .map-btn:hover { border-color: var(--light-blue); background: rgba(50, 194, 255, 0.08); }
+  .map-btn:active { transform: translateY(1px); }
+  .map-btn.primary {
+    background: var(--grad-mb-g); color: var(--dark-blue);
+    border-color: transparent;
+    box-shadow: 0 8px 24px -10px rgba(0, 255, 134, 0.5);
+  }
+  .map-btn.primary:hover { filter: brightness(1.08); border-color: transparent; background: var(--grad-mb-g); }
+  .map-btn svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+  .empty {
+    border: 1.5px dashed var(--line-strong);
+    border-radius: 20px;
+    padding: 56px 28px;
+    text-align: center;
+    color: var(--ink-soft);
+  }
+  .empty svg { width: 44px; height: 44px; margin: 0 auto 16px; color: var(--light-blue); opacity: 0.6; }
+  .empty .ttl { text-transform: uppercase; letter-spacing: 0.18em; font-size: 12px; color: var(--ink-faint); font-weight: 700; }
+  .empty .msg { margin-top: 10px; font-size: 15px; }
+
+  .notfound {
+    background: var(--panel-bright);
+    border: 1.5px solid rgba(225, 0, 84, 0.4);
+    border-radius: 20px;
+    padding: 32px 28px;
+    text-align: center;
+    animation: shake 0.4s;
+  }
+  .notfound .head { color: var(--tert-red); text-transform: uppercase; letter-spacing: 0.16em; font-size: 12px; font-weight: 800; }
+  .notfound .body { margin-top: 12px; color: var(--ink); font-size: 16px; }
+  .notfound .body code {
+    background: rgba(0, 0, 0, 0.35);
+    padding: 4px 10px; border-radius: 6px;
+    color: var(--light-blue);
+    border: 1px solid var(--line);
+    font-weight: 700;
+  }
+
+  .footer {
+    margin-top: 48px; padding-top: 24px;
+    border-top: 1px solid var(--line);
+    display: flex; justify-content: space-between; align-items: center;
+    flex-wrap: wrap; gap: 12px;
+    font-size: 12px; color: var(--ink-faint); font-weight: 500;
+  }
+
+  @media (max-width: 760px) {
+    .topbar-inner { padding: 12px 14px; gap: 8px; }
+    .user-chip { display: none !important; }
+    .nav-link { padding: 6px 10px; font-size: 12px; }
+    .brand-text .sub { display: none; }
+    .lock-btn span { display: none; }
+    .lock-btn { padding: 6px 8px; }
+    .wrap { padding: 32px 18px 60px; }
+    .hero { grid-template-columns: 1fr; gap: 24px; align-items: start; }
+    .stats { justify-content: flex-start; }
+    .search-grid { grid-template-columns: 1fr; }
+    .btn { width: 100%; justify-content: center; }
+    .grid-info { grid-template-columns: 1fr; }
+    .id-block .id-num { font-size: 32px; }
+    .result-head { padding: 22px; }
+    .info-cell { padding: 18px 22px; }
+    .map-row { padding: 18px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="gate" id="gate">
+  <div class="gate-card" id="gateCard">
+    <div style="display:flex;justify-content:center">
+      <div class="gate-logo"><svg viewBox="0 0 56 40" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="logoGradGate" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#0027B9"/>
+      <stop offset="50%" stop-color="#0080FF"/>
+      <stop offset="100%" stop-color="#00FF86"/>
+    </linearGradient>
+  </defs>
+  <path d="M2 26 C 12 26, 16 6, 26 14 C 36 22, 40 26, 54 14"
+        fill="none" stroke="url(#logoGradGate)" stroke-width="3.5" stroke-linecap="round"/>
+  <text x="28" y="38" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif"
+        font-weight="800" font-size="13" fill="#FFFFFF" letter-spacing="-0.5">se</text>
+</svg></div>
+    </div>
+    <h2>Sign In</h2>
+    <p>Enter your PRN and password to access the equipment system.</p>
+    <div class="gate-field">
+      <label for="prn">PRN</label>
+      <input type="text" id="prn" placeholder="e.g. 12345" autocomplete="username" inputmode="numeric" pattern="[0-9]*" />
+    </div>
+    <div class="gate-field">
+      <label for="pw">Password</label>
+      <div class="gate-input-wrap">
+        <input type="password" id="pw" placeholder="••••••••" autocomplete="current-password" />
+        <button type="button" class="toggle-pw" id="togglePw" aria-label="Show password">
+          <svg id="eyeOpen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg id="eyeClosed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
+        </button>
+      </div>
+    </div>
+    <button class="gate-btn" id="unlockBtn">
+      <span id="unlockTxt">Sign In</span>
+    </button>
+    <div class="gate-msg" id="gateMsg">&nbsp;</div>
+  </div>
+</div>
+
+<div class="app" id="app">
+  <div class="heartbeat-bg" aria-hidden="true">
+    <svg viewBox="0 0 2400 600" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="hbGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#0027B9" stop-opacity="0"/>
+          <stop offset="20%" stop-color="#0080FF" stop-opacity="0.5"/>
+          <stop offset="55%" stop-color="#32C2FF" stop-opacity="0.7"/>
+          <stop offset="85%" stop-color="#00FF86" stop-opacity="0.5"/>
+          <stop offset="100%" stop-color="#00FF86" stop-opacity="0"/>
+        </linearGradient>
+        <linearGradient id="hbFill" x1="0%" y1="0%" x2="0%" y2="100%">
+          <stop offset="0%" stop-color="#32C2FF" stop-opacity="0.18"/>
+          <stop offset="100%" stop-color="#00183A" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <path d="M0,420 C300,420 350,420 500,420 C600,420 640,200 740,200 C840,200 880,500 980,500 C1080,500 1120,150 1240,150 C1360,150 1400,460 1520,460 C1640,460 1680,260 1800,260 C1920,260 1960,420 2080,420 C2200,420 2400,420 2400,420 L2400,600 L0,600 Z" fill="url(#hbFill)"/>
+      <path d="M0,420 C300,420 350,420 500,420 C600,420 640,200 740,200 C840,200 880,500 980,500 C1080,500 1120,150 1240,150 C1360,150 1400,460 1520,460 C1640,460 1680,260 1800,260 C1920,260 1960,420 2080,420 C2200,420 2400,420 2400,420" fill="none" stroke="url(#hbGrad)" stroke-width="3"/>
+    </svg>
+  </div>
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="index.html" style="text-decoration:none;color:inherit">
+        <div class="logo"><svg viewBox="0 0 56 40" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="logoGradTop" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#0027B9"/>
+      <stop offset="50%" stop-color="#0080FF"/>
+      <stop offset="100%" stop-color="#00FF86"/>
+    </linearGradient>
+  </defs>
+  <path d="M2 26 C 12 26, 16 6, 26 14 C 36 22, 40 26, 54 14"
+        fill="none" stroke="url(#logoGradTop)" stroke-width="3.5" stroke-linecap="round"/>
+  <text x="28" y="38" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif"
+        font-weight="800" font-size="13" fill="#FFFFFF" letter-spacing="-0.5">se</text>
+</svg></div>
+        <div class="brand-text">
+          <div class="name">Saudi Energy</div>
+          <div class="sub">Equipment Locator</div>
+        </div>
+      </a>
+      <nav class="nav-links">
+        <a class="nav-link " href="index.html">Home</a>
+        <a class="nav-link active" href="equipment_locator.html">EQ Locator</a>
+        <a class="nav-link " href="map_view.html">Map View</a>
+        <a class="nav-link admin-only " href="user_management.html" id="adminLink">Users</a>
+      </nav>
+      <div class="meta">
+        <span class="user-chip" id="userChip" style="display:none">
+          <span class="user-avatar" id="userAvatar">?</span>
+          <span id="userPrn">—</span>
+          <span class="user-role" id="userRole">agent</span>
+        </span>
+        <button class="lock-btn" id="lockBtn" title="Sign out">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span>Sign out</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="hero">
+      <div>
+        <h1>Jeddah <span class="grad">Locations</span></h1>
+        <p>Enter the equipment number, select its type, and get the exact location with a one-tap link to Google Maps for navigation in the field.</p>
+      </div>
+      <div class="stats">
+        <div class="stat rmu">
+          <div class="num" id="cntRmu">0</div>
+          <div class="lbl">Smart RMU</div>
+        </div>
+        <div class="stat oh">
+          <div class="num" id="cntOh">0</div>
+          <div class="lbl">Smart OH</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="search-card">
+      <div class="search-label">Lookup</div>
+      <div class="search-grid">
+        <div>
+          <input type="text" id="eqNo" placeholder="Equipment number, e.g. 27224" autocomplete="off" inputmode="numeric" />
+        </div>
+        <div>
+          <select id="eqType">
+            <option value="SMART RMU">Smart RMU</option>
+            <option value="SMART OH">Smart OH</option>
+          </select>
+        </div>
+        <button class="btn" id="searchBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <span id="searchBtnTxt">Locate</span>
+        </button>
+      </div>
+    </section>
+
+    <section class="results" id="results">
+      <div class="empty">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+        <div class="ttl">Awaiting search</div>
+        <div class="msg">Enter an equipment number above to begin.</div>
+      </div>
+    </section>
+
+    <div class="footer">
+      <span>Made by Eng: Rayan Alharbi</span>
+      <span>Live data · Saudi Energy</span>
+    </div>
+  </main>
+</div>
+
+<script>
+const SUPABASE_URL = "https://spjaqkvdiazfeotylxny.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNwamFxa3ZkaWF6ZmVvdHlseG55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDIwMjcsImV4cCI6MjA5NzM3ODAyN30.i9Z5olz6dAa1KxLp9V0OgSsYd3XVawoyURj_3VjpIJw";
+const EMAIL_DOMAIN = "saudienergy.local";
+const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let CURRENT_USER = null;
+let CURRENT_PROFILE = null;
+
+const gate = document.getElementById('gate');
+const gateCard = document.getElementById('gateCard');
+const prnInput = document.getElementById('prn');
+const pwInput = document.getElementById('pw');
+const unlockBtn = document.getElementById('unlockBtn');
+const unlockTxt = document.getElementById('unlockTxt');
+const gateMsg = document.getElementById('gateMsg');
+const togglePw = document.getElementById('togglePw');
+const eyeOpen = document.getElementById('eyeOpen');
+const eyeClosed = document.getElementById('eyeClosed');
+
+function prnToEmail(prn) {
+  return `prn-${prn}@${EMAIL_DOMAIN}`;
+}
+
+async function fetchProfile(userId) {
+  const { data, error } = await supa.from('profiles').select('id, prn, email, full_name, role').eq('id', userId).single();
+  if (error) throw error;
+  return data;
+}
+
+function updateUserChip(profile) {
+  const chip = document.getElementById('userChip');
+  if (!chip) return;
+  chip.style.display = 'inline-flex';
+  document.getElementById('userPrn').textContent = profile.prn || profile.full_name || 'User';
+  const initial = (profile.full_name || profile.prn || '?').charAt(0).toUpperCase();
+  document.getElementById('userAvatar').textContent = initial;
+  const roleEl = document.getElementById('userRole');
+  roleEl.textContent = profile.role === 'super_admin' ? 'admin' : 'agent';
+  roleEl.classList.toggle('admin', profile.role === 'super_admin');
+  const adminLink = document.getElementById('adminLink');
+  if (adminLink && profile.role === 'super_admin') adminLink.classList.add('visible');
+}
+
+async function tryLogin(prn, password) {
+  unlockBtn.disabled = true;
+  unlockTxt.innerHTML = '<span class="spinner"></span>';
+  gateMsg.classList.remove('error', 'ok');
+  gateMsg.textContent = 'Signing in…';
+  pwInput.classList.remove('error');
+  prnInput.classList.remove('error');
+
+  try {
+    if (!/^[0-9]+$/.test(prn)) {
+      throw new Error('PRN must be digits only');
+    }
+    const email = prnToEmail(prn);
+    const { data, error } = await supa.auth.signInWithPassword({ email, password });
+    if (error) {
+      throw new Error(error.message.toLowerCase().includes('invalid') ? 'Incorrect PRN or password' : error.message);
+    }
+    CURRENT_USER = data.user;
+    CURRENT_PROFILE = await fetchProfile(CURRENT_USER.id);
+    updateUserChip(CURRENT_PROFILE);
+    gateMsg.classList.add('ok');
+    gateMsg.textContent = 'Signed in';
+    setTimeout(() => {
+      gate.classList.add('hidden');
+      pwInput.value = '';
+      if (typeof onAuthReady === 'function') onAuthReady(CURRENT_USER, CURRENT_PROFILE);
+    }, 250);
+  } catch (err) {
+    gateMsg.classList.add('error');
+    gateMsg.textContent = err.message || 'Sign in failed';
+    pwInput.classList.add('error');
+    prnInput.classList.add('error');
+    gateCard.classList.remove('shake'); void gateCard.offsetWidth; gateCard.classList.add('shake');
+    unlockBtn.disabled = false;
+    unlockTxt.textContent = 'Sign In';
+    pwInput.focus(); pwInput.select();
+  }
+}
+
+unlockBtn.addEventListener('click', () => {
+  const prn = prnInput.value.trim();
+  const p = pwInput.value;
+  if (!prn || !p) {
+    if (!prn) prnInput.focus(); else pwInput.focus();
+    return;
+  }
+  tryLogin(prn, p);
+});
+[prnInput, pwInput].forEach(el => el.addEventListener('keydown', e => { if (e.key === 'Enter') unlockBtn.click(); }));
+togglePw.addEventListener('click', () => {
+  const isPw = pwInput.type === 'password';
+  pwInput.type = isPw ? 'text' : 'password';
+  eyeOpen.style.display = isPw ? 'none' : '';
+  eyeClosed.style.display = isPw ? '' : 'none';
+});
+
+document.getElementById('lockBtn').addEventListener('click', async () => {
+  await supa.auth.signOut();
+  location.reload();
+});
+
+(async function init() {
+  const { data: { session } } = await supa.auth.getSession();
+  if (session) {
+    CURRENT_USER = session.user;
+    try {
+      CURRENT_PROFILE = await fetchProfile(CURRENT_USER.id);
+      updateUserChip(CURRENT_PROFILE);
+      gate.classList.add('hidden');
+      if (typeof onAuthReady === 'function') onAuthReady(CURRENT_USER, CURRENT_PROFILE);
+    } catch (e) {
+      await supa.auth.signOut();
+      prnInput.focus();
+    }
+  } else {
+    prnInput.focus();
+  }
+})();
+
+
+async function fetchStats() {
+  const [{ count: rmu }, { count: oh }] = await Promise.all([
+    supa.from('equipment').select('*', { count: 'exact', head: true }).eq('equipment_type', 'SMART RMU'),
+    supa.from('equipment').select('*', { count: 'exact', head: true }).eq('equipment_type', 'SMART OH'),
+  ]);
+  animateCount(document.getElementById('cntRmu'), rmu || 0);
+  animateCount(document.getElementById('cntOh'),  oh  || 0);
+}
+
+function animateCount(el, target) {
+  const dur = 900;
+  const start = performance.now();
+  function step(now) {
+    const t = Math.min(1, (now - start) / dur);
+    const eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = Math.floor(eased * target).toLocaleString();
+    if (t < 1) requestAnimationFrame(step);
+    else el.textContent = target.toLocaleString();
+  }
+  requestAnimationFrame(step);
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function renderNotFound(no, type) {
+  document.getElementById('results').innerHTML = `
+    <div class="notfound">
+      <div class="head">No match found</div>
+      <div class="body">No <strong>${escapeHtml(type)}</strong> with equipment number <code>${escapeHtml(no)}</code> in the database.</div>
+    </div>`;
+}
+
+function renderError(msg) {
+  document.getElementById('results').innerHTML = `
+    <div class="notfound">
+      <div class="head">Error</div>
+      <div class="body">${escapeHtml(msg)}</div>
+    </div>`;
+}
+
+function renderResult(r) {
+  const typeClass = r.equipment_type === 'SMART RMU' ? 'badge-rmu' : 'badge-oh';
+  const gmaps = `https://www.google.com/maps?q=${r.lat},${r.lon}`;
+  const gmapsDir = `https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lon}`;
+  document.getElementById('results').innerHTML = `
+    <div class="result-card">
+      <div class="result-head">
+        <div class="id-block">
+          <div class="id-label">Equipment №</div>
+          <div class="id-num">${escapeHtml(r.equipment_no)}</div>
+        </div>
+        <span class="badge ${typeClass}"><span class="dot"></span>${escapeHtml(r.equipment_type)}</span>
+      </div>
+      <div class="grid-info">
+        <div class="info-cell"><div class="lbl">District</div><div class="val">${escapeHtml(r.district || '—')}</div></div>
+        <div class="info-cell"><div class="lbl">Zone</div><div class="val">${escapeHtml(r.zone || '—')}</div></div>
+        <div class="info-cell"><div class="lbl">Vendor</div><div class="val">${escapeHtml(r.vendor || '—')}</div></div>
+        <div class="info-cell"><div class="lbl">RTU</div><div class="val">${escapeHtml(r.rtu || '—')}</div></div>
+        <div class="info-cell"><div class="lbl">Modem</div><div class="val">${escapeHtml(r.modem || '—')}</div></div>
+        <div class="info-cell"><div class="lbl">Coordinates</div><div class="val coord">${r.lat}, ${r.lon}</div></div>
+      </div>
+      <div class="map-row">
+        <a class="map-btn primary" href="${gmapsDir}" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+          Navigate
+        </a>
+        <a class="map-btn" href="${gmaps}" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+          View on Map
+        </a>
+      </div>
+    </div>`;
+}
+
+async function doSearch() {
+  const eqNoEl = document.getElementById('eqNo');
+  const eqTypeEl = document.getElementById('eqType');
+  const btn = document.getElementById('searchBtn');
+  const btnTxt = document.getElementById('searchBtnTxt');
+  const no = eqNoEl.value.trim().replace(/\.0+$/, '');
+  const type = eqTypeEl.value;
+  if (!no) {
+    eqNoEl.focus();
+    eqNoEl.style.borderColor = 'var(--tert-red)';
+    setTimeout(() => eqNoEl.style.borderColor = '', 800);
+    return;
+  }
+  btn.disabled = true;
+  btnTxt.innerHTML = '<span class="spinner"></span>';
+  try {
+    const { data, error } = await supa
+      .from('equipment')
+      .select('*')
+      .eq('equipment_no', no)
+      .eq('equipment_type', type)
+      .maybeSingle();
+    if (error) { renderError(error.message); return; }
+    if (!data) renderNotFound(no, type); else renderResult(data);
+  } catch (e) {
+    renderError(e.message || String(e));
+  } finally {
+    btn.disabled = false;
+    btnTxt.textContent = 'Locate';
+    eqNoEl.blur();
+  }
+}
+
+// Called after auth succeeds
+function onAuthReady(user, profile) {
+  document.getElementById('app').classList.add('ready');
+  fetchStats();
+  document.getElementById('searchBtn').addEventListener('click', doSearch);
+  const eqNoEl = document.getElementById('eqNo');
+  eqNoEl.addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+  document.getElementById('eqType').addEventListener('keydown', e => { if (e.key === 'Enter') doSearch(); });
+  if (window.matchMedia('(min-width: 760px)').matches) eqNoEl.focus();
+}
+
+</script>
+</body>
+</html>

@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>
+<script src="https://cdn.jsdelivr.net/npm/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<title>Map View — Saudi Energy</title>
+<style>
+  :root {
+    --extra-dark-blue: #00183A;
+    --dark-blue: #001F5E;
+    --blue: #0027B9;
+    --mid-blue: #0080FF;
+    --light-blue: #32C2FF;
+    --green: #00FF86;
+    --white: #FFFFFF;
+    --tert-red: #E10054;
+    --tert-orange: #EF9B00;
+    --tert-green: #00B476;
+
+    --bg: var(--dark-blue);
+    --bg-deep: var(--extra-dark-blue);
+    --ink: var(--white);
+    --ink-soft: rgba(255, 255, 255, 0.72);
+    --ink-faint: rgba(255, 255, 255, 0.45);
+    --line: rgba(255, 255, 255, 0.12);
+    --line-strong: rgba(255, 255, 255, 0.22);
+    --panel: rgba(255, 255, 255, 0.04);
+    --panel-bright: rgba(255, 255, 255, 0.07);
+
+    --grad-mb-g: linear-gradient(135deg, var(--mid-blue), var(--green));
+    --grad-mb-lb: linear-gradient(135deg, var(--mid-blue), var(--light-blue));
+    --grad-lb-g: linear-gradient(135deg, var(--light-blue), var(--green));
+    --grad-full: linear-gradient(135deg, var(--dark-blue) 0%, var(--blue) 35%, var(--mid-blue) 65%, var(--green) 100%);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: var(--ink); line-height: 1.5; }
+
+  /* === LOGIN GATE === */
+  .gate {
+    position: fixed; inset: 0; z-index: 1000;
+    display: grid; place-items: center;
+    padding: 24px;
+    background: var(--bg);
+    background-image:
+      radial-gradient(900px 600px at 50% 0%, rgba(0, 128, 255, 0.18), transparent 60%),
+      radial-gradient(700px 500px at 50% 100%, rgba(0, 255, 134, 0.10), transparent 60%);
+    transition: opacity 0.4s ease, visibility 0.4s;
+  }
+  .gate.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+  .gate-card {
+    width: 100%; max-width: 440px;
+    background: var(--panel-bright);
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    padding: 40px 32px;
+    backdrop-filter: blur(12px);
+    position: relative; overflow: hidden;
+  }
+  .gate-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 2px; background: var(--grad-full);
+  }
+  .gate-logo { width: 72px; height: 52px; margin: 0 auto 18px; display: block; }
+  .gate h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 6px; text-align: center; }
+  .gate p { font-size: 13px; color: var(--ink-soft); margin-bottom: 28px; text-align: center; }
+  .gate-field { margin-bottom: 12px; }
+  .gate-field label {
+    display: block;
+    font-size: 10px;
+    color: var(--ink-faint);
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+  .gate input {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1.5px solid var(--line-strong);
+    border-radius: 12px;
+    padding: 14px 16px;
+    color: var(--ink);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 15px; font-weight: 500;
+    height: 50px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .gate input::placeholder { color: var(--ink-faint); }
+  .gate input:focus {
+    outline: none;
+    border-color: var(--light-blue);
+    box-shadow: 0 0 0 4px rgba(50, 194, 255, 0.18);
+  }
+  .gate input.error { border-color: var(--tert-red); box-shadow: 0 0 0 4px rgba(225, 0, 84, 0.15); }
+  .gate-input-wrap { position: relative; }
+  .toggle-pw {
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    background: none; border: none;
+    color: var(--ink-faint);
+    cursor: pointer; padding: 6px;
+    display: flex; align-items: center; justify-content: center;
+    transition: color 0.2s;
+  }
+  .toggle-pw:hover { color: var(--light-blue); }
+  .toggle-pw svg { width: 18px; height: 18px; }
+  .gate-btn {
+    width: 100%;
+    margin-top: 4px;
+    background: var(--grad-mb-g);
+    color: var(--dark-blue);
+    border: none; border-radius: 12px;
+    padding: 0 24px; height: 52px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 800; font-size: 14px;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: filter 0.2s, transform 0.1s;
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    box-shadow: 0 8px 24px -10px rgba(0, 255, 134, 0.45);
+  }
+  .gate-btn:hover:not(:disabled) { filter: brightness(1.08); }
+  .gate-btn:active:not(:disabled) { transform: translateY(1px); }
+  .gate-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .gate-btn .spinner {
+    width: 18px; height: 18px;
+    border: 2.5px solid rgba(0, 31, 94, 0.3);
+    border-top-color: var(--dark-blue);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .gate-msg { margin-top: 14px; font-size: 13px; min-height: 18px; color: var(--ink-faint); text-align: center; }
+  .gate-msg.error { color: var(--tert-red); font-weight: 600; }
+  .gate-msg.ok { color: var(--green); font-weight: 600; }
+  .shake { animation: shake 0.4s; }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-8px); }
+    75% { transform: translateX(8px); }
+  }
+
+  /* === TOP BAR === */
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(0, 24, 58, 0.92);
+    backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar-inner {
+    max-width: 1180px; margin: 0 auto;
+    padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .logo { width: 48px; height: 36px; flex-shrink: 0; }
+  .logo svg { width: 100%; height: 100%; display: block; }
+  .brand-text { line-height: 1.05; }
+  .brand-text .name { font-weight: 800; font-size: 15px; letter-spacing: -0.01em; }
+  .brand-text .sub {
+    font-size: 10px; color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: 0.16em; margin-top: 4px;
+    font-weight: 600;
+  }
+  .nav-links { display: flex; gap: 4px; }
+  .nav-link {
+    color: var(--ink-soft);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: 13px;
+    padding: 8px 14px;
+    border-radius: 8px;
+    transition: background 0.2s, color 0.2s;
+    white-space: nowrap;
+  }
+  .nav-link:hover { background: var(--panel); color: var(--ink); }
+  .nav-link.active {
+    background: rgba(50, 194, 255, 0.12);
+    color: var(--light-blue);
+    border: 1px solid rgba(50, 194, 255, 0.3);
+  }
+  .nav-link.admin-only { display: none; }
+  .nav-link.admin-only.visible { display: inline-block; }
+  .meta { display: flex; align-items: center; gap: 10px; }
+  .user-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 6px 12px 6px 6px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    font-weight: 500;
+  }
+  .user-avatar {
+    width: 22px; height: 22px;
+    border-radius: 50%;
+    background: var(--grad-mb-g);
+    color: var(--dark-blue);
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+  }
+  .user-role {
+    font-size: 9px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: var(--light-blue);
+    font-weight: 700;
+    margin-left: 4px;
+  }
+  .user-role.admin { color: var(--green); }
+  .lock-btn {
+    background: none;
+    border: 1px solid var(--line-strong);
+    border-radius: 8px;
+    color: var(--ink-soft);
+    padding: 6px 12px;
+    font-size: 11px; font-weight: 600;
+    cursor: pointer;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    transition: border-color 0.2s, color 0.2s;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+  .lock-btn:hover { border-color: var(--tert-red); color: var(--tert-red); }
+  .lock-btn svg { width: 12px; height: 12px; }
+
+  html, body { height: 100%; overflow: hidden; }
+  .app { display: none; height: 100vh; flex-direction: column; }
+  .app.ready { display: flex; }
+
+  .topbar { flex-shrink: 0; z-index: 500; }
+
+  .map-wrap { flex: 1; position: relative; overflow: hidden; }
+  #map { width: 100%; height: 100%; background: #F2F3F5; }
+
+  .filter-panel {
+    position: absolute;
+    top: 16px; left: 16px;
+    z-index: 400;
+    background: rgba(0, 24, 58, 0.92);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 18px;
+    width: 320px;
+    max-width: calc(100vw - 32px);
+    box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.6);
+    transition: transform 0.3s, opacity 0.3s;
+  }
+  .filter-panel.collapsed { transform: translateX(calc(-100% + 56px)); }
+  .filter-toggle {
+    position: absolute;
+    right: -1px; top: 14px;
+    width: 32px; height: 32px;
+    background: var(--bg-deep);
+    border: 1px solid var(--line); border-left: none;
+    border-radius: 0 8px 8px 0;
+    color: var(--light-blue);
+    cursor: pointer;
+    display: none;
+    align-items: center; justify-content: center;
+    transition: transform 0.3s;
+  }
+  .filter-panel.collapsed .filter-toggle { transform: translateX(32px); border-radius: 8px; border-left: 1px solid var(--line); }
+  .filter-toggle svg { width: 14px; height: 14px; }
+
+  .filter-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
+  .filter-title {
+    font-size: 11px; text-transform: uppercase;
+    letter-spacing: 0.18em; font-weight: 700;
+    color: var(--ink-faint);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .filter-title::before { content: ''; width: 22px; height: 2px; background: var(--grad-mb-g); border-radius: 2px; }
+  .filter-count { font-size: 12px; color: var(--light-blue); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+  .filter-row { margin-bottom: 12px; }
+  .filter-row:last-child { margin-bottom: 0; }
+  .filter-row label {
+    display: block; font-size: 11px; color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: 0.12em;
+    margin-bottom: 6px; font-weight: 700;
+  }
+  .filter-row input[type="text"], .filter-row select {
+    width: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1.5px solid var(--line-strong);
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: var(--ink);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 14px; font-weight: 500;
+    height: 42px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    appearance: none; -webkit-appearance: none;
+  }
+  .filter-row input::placeholder { color: var(--ink-faint); }
+  .filter-row input:focus, .filter-row select:focus {
+    outline: none;
+    border-color: var(--light-blue);
+    box-shadow: 0 0 0 3px rgba(50, 194, 255, 0.15);
+  }
+  .filter-row select {
+    cursor: pointer;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath fill='%2332C2FF' d='M5 6L0 0h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 36px;
+  }
+  .filter-row select option { background: var(--dark-blue); color: var(--ink); }
+
+  .type-chips { display: flex; gap: 6px; }
+  .chip {
+    flex: 1;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1.5px solid var(--line-strong);
+    border-radius: 10px;
+    padding: 9px 10px;
+    color: var(--ink-soft);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 700; font-size: 11px;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .chip:hover { border-color: var(--line-strong); background: rgba(255, 255, 255, 0.04); }
+  .chip .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .chip[data-type="all"] .dot { background: linear-gradient(135deg, var(--light-blue), var(--green)); }
+  .chip[data-type="SMART RMU"] .dot { background: var(--mid-blue); }
+  .chip[data-type="SMART OH"] .dot { background: var(--tert-green); }
+  .chip.active { color: var(--ink); background: rgba(50, 194, 255, 0.12); border-color: var(--light-blue); }
+  .chip[data-type="SMART OH"].active { background: rgba(0, 255, 134, 0.12); border-color: var(--green); }
+
+  .reset-btn {
+    width: 100%; margin-top: 6px;
+    background: none;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    color: var(--ink-soft);
+    padding: 9px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 600; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+  }
+  .reset-btn:hover { border-color: var(--light-blue); color: var(--light-blue); }
+
+  .legend {
+    position: absolute;
+    bottom: 16px; right: 16px;
+    z-index: 400;
+    background: rgba(0, 24, 58, 0.92);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 12px 14px;
+    font-size: 12px;
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+  }
+  .legend-row { display: flex; align-items: center; gap: 8px; }
+  .legend-row + .legend-row { margin-top: 6px; }
+  .legend-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid #FFFFFF; box-shadow: 0 0 0 1px rgba(0,24,58,0.2); }
+  .legend-dot.rmu { background: var(--mid-blue); }
+  .legend-dot.oh  { background: var(--tert-green); }
+
+  /* Popups */
+  .leaflet-popup-content-wrapper {
+    background: var(--bg-deep); color: var(--ink);
+    border-radius: 14px; border: 1px solid var(--line-strong);
+    box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.7);
+    padding: 0;
+  }
+  .leaflet-popup-content { margin: 0; width: 280px !important; font-family: 'Plus Jakarta Sans', sans-serif; }
+  .leaflet-popup-tip { background: var(--bg-deep); border: 1px solid var(--line-strong); }
+  .leaflet-popup-close-button {
+    color: var(--ink-faint) !important;
+    font-size: 22px !important;
+    padding: 8px 10px 0 0 !important;
+  }
+  .leaflet-popup-close-button:hover { color: var(--ink) !important; }
+
+  .pop { padding: 18px 18px 14px; }
+  .pop-head {
+    display: flex; justify-content: space-between; align-items: flex-start; gap: 10px;
+    margin-bottom: 14px; padding-bottom: 12px;
+    border-bottom: 1px solid var(--line);
+  }
+  .pop-id { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; color: var(--ink); }
+  .pop-id .lbl {
+    display: block; font-size: 9px;
+    color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: 0.16em;
+    font-weight: 700; margin-bottom: 4px;
+  }
+  .pop-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 5px 10px; border-radius: 999px;
+    font-size: 10px; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    border: 1.5px solid; white-space: nowrap; flex-shrink: 0;
+  }
+  .pop-badge.rmu { color: var(--light-blue); border-color: rgba(50, 194, 255, 0.5); background: rgba(50, 194, 255, 0.1); }
+  .pop-badge.oh  { color: var(--green);      border-color: rgba(0, 255, 134, 0.5); background: rgba(0, 255, 134, 0.1); }
+  .pop-badge .d { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+
+  .pop-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; margin-bottom: 14px; }
+  .pop-grid .cell .lbl {
+    font-size: 9px; color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: 0.14em;
+    font-weight: 700; margin-bottom: 3px;
+  }
+  .pop-grid .cell .val { font-size: 13px; color: var(--ink); font-weight: 600; word-break: break-word; }
+  .pop-grid .cell.full { grid-column: 1 / -1; }
+  .pop-grid .cell .val.coord { color: var(--light-blue); font-variant-numeric: tabular-nums; font-size: 12px; }
+
+  .pop-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%;
+    background: var(--grad-mb-g);
+    color: var(--dark-blue);
+    border: none; border-radius: 10px;
+    padding: 11px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 800; font-size: 12px;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    text-decoration: none;
+    cursor: pointer;
+    transition: filter 0.2s;
+  }
+  .pop-btn:hover { filter: brightness(1.1); }
+  .pop-btn svg { width: 14px; height: 14px; }
+
+  .marker-cluster-small { background: rgba(50, 194, 255, 0.25); }
+  .marker-cluster-small div { background: rgba(50, 194, 255, 0.85); color: var(--dark-blue); font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; }
+  .marker-cluster-medium { background: rgba(0, 128, 255, 0.25); }
+  .marker-cluster-medium div { background: rgba(0, 128, 255, 0.9); color: var(--white); font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; }
+  .marker-cluster-large { background: rgba(0, 39, 185, 0.3); }
+  .marker-cluster-large div { background: rgba(0, 39, 185, 0.95); color: var(--white); font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; }
+
+  .eq-marker {
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    border: 2px solid #FFFFFF;
+    box-shadow: 0 2px 4px rgba(0, 24, 58, 0.4), 0 0 0 1px rgba(0, 24, 58, 0.15);
+  }
+  .eq-marker.rmu { background: var(--mid-blue); }
+  .eq-marker.oh  { background: var(--tert-green); }
+
+  .map-loading {
+    position: absolute; inset: 0;
+    background: #F2F3F5;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px;
+    z-index: 600;
+    transition: opacity 0.3s;
+  }
+  .map-loading.gone { opacity: 0; pointer-events: none; }
+  .map-loading .lspin {
+    width: 36px; height: 36px;
+    border: 3px solid rgba(0, 128, 255, 0.2);
+    border-top-color: var(--mid-blue);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .map-loading .ltext {
+    font-size: 12px;
+    color: #5a6878;
+    text-transform: uppercase;
+    letter-spacing: 0.16em;
+    font-weight: 700;
+  }
+
+  @media (max-width: 760px) {
+    .topbar-inner { padding: 12px 14px; gap: 8px; }
+    .user-chip { display: none !important; }
+    .nav-link { padding: 6px 10px; font-size: 12px; }
+    .brand-text .sub { display: none; }
+    .lock-btn span { display: none; }
+    .lock-btn { padding: 6px 8px; }
+    .filter-panel { width: calc(100vw - 32px); padding: 14px; }
+    .filter-toggle { display: flex; }
+    .legend { padding: 10px 12px; font-size: 11px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="gate" id="gate">
+  <div class="gate-card" id="gateCard">
+    <div style="display:flex;justify-content:center">
+      <div class="gate-logo"><svg viewBox="0 0 56 40" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="logoGradGate" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#0027B9"/>
+      <stop offset="50%" stop-color="#0080FF"/>
+      <stop offset="100%" stop-color="#00FF86"/>
+    </linearGradient>
+  </defs>
+  <path d="M2 26 C 12 26, 16 6, 26 14 C 36 22, 40 26, 54 14"
+        fill="none" stroke="url(#logoGradGate)" stroke-width="3.5" stroke-linecap="round"/>
+  <text x="28" y="38" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif"
+        font-weight="800" font-size="13" fill="#FFFFFF" letter-spacing="-0.5">se</text>
+</svg></div>
+    </div>
+    <h2>Sign In</h2>
+    <p>Enter your PRN and password to access the equipment system.</p>
+    <div class="gate-field">
+      <label for="prn">PRN</label>
+      <input type="text" id="prn" placeholder="e.g. 12345" autocomplete="username" inputmode="numeric" pattern="[0-9]*" />
+    </div>
+    <div class="gate-field">
+      <label for="pw">Password</label>
+      <div class="gate-input-wrap">
+        <input type="password" id="pw" placeholder="••••••••" autocomplete="current-password" />
+        <button type="button" class="toggle-pw" id="togglePw" aria-label="Show password">
+          <svg id="eyeOpen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg id="eyeClosed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
+        </button>
+      </div>
+    </div>
+    <button class="gate-btn" id="unlockBtn">
+      <span id="unlockTxt">Sign In</span>
+    </button>
+    <div class="gate-msg" id="gateMsg">&nbsp;</div>
+  </div>
+</div>
+
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="index.html" style="text-decoration:none;color:inherit">
+        <div class="logo"><svg viewBox="0 0 56 40" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="logoGradTop" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#0027B9"/>
+      <stop offset="50%" stop-color="#0080FF"/>
+      <stop offset="100%" stop-color="#00FF86"/>
+    </linearGradient>
+  </defs>
+  <path d="M2 26 C 12 26, 16 6, 26 14 C 36 22, 40 26, 54 14"
+        fill="none" stroke="url(#logoGradTop)" stroke-width="3.5" stroke-linecap="round"/>
+  <text x="28" y="38" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif"
+        font-weight="800" font-size="13" fill="#FFFFFF" letter-spacing="-0.5">se</text>
+</svg></div>
+        <div class="brand-text">
+          <div class="name">Saudi Energy</div>
+          <div class="sub">Equipment Locator</div>
+        </div>
+      </a>
+      <nav class="nav-links">
+        <a class="nav-link " href="index.html">Home</a>
+        <a class="nav-link " href="equipment_locator.html">EQ Locator</a>
+        <a class="nav-link active" href="map_view.html">Map View</a>
+        <a class="nav-link admin-only " href="user_management.html" id="adminLink">Users</a>
+      </nav>
+      <div class="meta">
+        <span class="user-chip" id="userChip" style="display:none">
+          <span class="user-avatar" id="userAvatar">?</span>
+          <span id="userPrn">—</span>
+          <span class="user-role" id="userRole">agent</span>
+        </span>
+        <button class="lock-btn" id="lockBtn" title="Sign out">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span>Sign out</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <div class="map-wrap">
+    <div class="map-loading" id="mapLoading">
+      <div class="lspin"></div>
+      <div class="ltext">Loading equipment…</div>
+    </div>
+    <div id="map"></div>
+
+    <div class="filter-panel" id="filterPanel">
+      <button class="filter-toggle" id="filterToggle" aria-label="Toggle filters">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <div class="filter-header">
+        <div class="filter-title">Filters</div>
+        <div class="filter-count" id="filterCount">0 visible</div>
+      </div>
+
+      <div class="filter-row">
+        <label>Type</label>
+        <div class="type-chips">
+          <button class="chip active" data-type="all"><span class="dot"></span>All</button>
+          <button class="chip" data-type="SMART RMU"><span class="dot"></span>RMU</button>
+          <button class="chip" data-type="SMART OH"><span class="dot"></span>OH</button>
+        </div>
+      </div>
+
+      <div class="filter-row">
+        <label>Search by Equipment №</label>
+        <input type="text" id="searchInput" placeholder="e.g. 27224" inputmode="numeric" autocomplete="off"/>
+      </div>
+
+      <div class="filter-row">
+        <label>Zone</label>
+        <select id="zoneSelect">
+          <option value="">All zones</option>
+          <option value="CENTRAL">Central · وسط</option>
+          <option value="NORTH">North · شمال</option>
+          <option value="SOUTH">South · جنوب</option>
+          <option value="EAST">East · شرق</option>
+          <option value="RABIGH">Rabigh · رابغ</option>
+        </select>
+      </div>
+
+      <div class="filter-row">
+        <label>District</label>
+        <select id="districtSelect">
+          <option value="">All districts</option>
+        </select>
+      </div>
+
+      <button class="reset-btn" id="resetBtn">Reset filters</button>
+    </div>
+
+    <div class="legend">
+      <div class="legend-row"><span class="legend-dot rmu"></span><span>Smart RMU</span></div>
+      <div class="legend-row"><span class="legend-dot oh"></span><span>Smart OH</span></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://spjaqkvdiazfeotylxny.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNwamFxa3ZkaWF6ZmVvdHlseG55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDIwMjcsImV4cCI6MjA5NzM3ODAyN30.i9Z5olz6dAa1KxLp9V0OgSsYd3XVawoyURj_3VjpIJw";
+const EMAIL_DOMAIN = "saudienergy.local";
+const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let CURRENT_USER = null;
+let CURRENT_PROFILE = null;
+
+const gate = document.getElementById('gate');
+const gateCard = document.getElementById('gateCard');
+const prnInput = document.getElementById('prn');
+const pwInput = document.getElementById('pw');
+const unlockBtn = document.getElementById('unlockBtn');
+const unlockTxt = document.getElementById('unlockTxt');
+const gateMsg = document.getElementById('gateMsg');
+const togglePw = document.getElementById('togglePw');
+const eyeOpen = document.getElementById('eyeOpen');
+const eyeClosed = document.getElementById('eyeClosed');
+
+function prnToEmail(prn) {
+  return `prn-${prn}@${EMAIL_DOMAIN}`;
+}
+
+async function fetchProfile(userId) {
+  const { data, error } = await supa.from('profiles').select('id, prn, email, full_name, role').eq('id', userId).single();
+  if (error) throw error;
+  return data;
+}
+
+function updateUserChip(profile) {
+  const chip = document.getElementById('userChip');
+  if (!chip) return;
+  chip.style.display = 'inline-flex';
+  document.getElementById('userPrn').textContent = profile.prn || profile.full_name || 'User';
+  const initial = (profile.full_name || profile.prn || '?').charAt(0).toUpperCase();
+  document.getElementById('userAvatar').textContent = initial;
+  const roleEl = document.getElementById('userRole');
+  roleEl.textContent = profile.role === 'super_admin' ? 'admin' : 'agent';
+  roleEl.classList.toggle('admin', profile.role === 'super_admin');
+  const adminLink = document.getElementById('adminLink');
+  if (adminLink && profile.role === 'super_admin') adminLink.classList.add('visible');
+}
+
+async function tryLogin(prn, password) {
+  unlockBtn.disabled = true;
+  unlockTxt.innerHTML = '<span class="spinner"></span>';
+  gateMsg.classList.remove('error', 'ok');
+  gateMsg.textContent = 'Signing in…';
+  pwInput.classList.remove('error');
+  prnInput.classList.remove('error');
+
+  try {
+    if (!/^[0-9]+$/.test(prn)) {
+      throw new Error('PRN must be digits only');
+    }
+    const email = prnToEmail(prn);
+    const { data, error } = await supa.auth.signInWithPassword({ email, password });
+    if (error) {
+      throw new Error(error.message.toLowerCase().includes('invalid') ? 'Incorrect PRN or password' : error.message);
+    }
+    CURRENT_USER = data.user;
+    CURRENT_PROFILE = await fetchProfile(CURRENT_USER.id);
+    updateUserChip(CURRENT_PROFILE);
+    gateMsg.classList.add('ok');
+    gateMsg.textContent = 'Signed in';
+    setTimeout(() => {
+      gate.classList.add('hidden');
+      pwInput.value = '';
+      if (typeof onAuthReady === 'function') onAuthReady(CURRENT_USER, CURRENT_PROFILE);
+    }, 250);
+  } catch (err) {
+    gateMsg.classList.add('error');
+    gateMsg.textContent = err.message || 'Sign in failed';
+    pwInput.classList.add('error');
+    prnInput.classList.add('error');
+    gateCard.classList.remove('shake'); void gateCard.offsetWidth; gateCard.classList.add('shake');
+    unlockBtn.disabled = false;
+    unlockTxt.textContent = 'Sign In';
+    pwInput.focus(); pwInput.select();
+  }
+}
+
+unlockBtn.addEventListener('click', () => {
+  const prn = prnInput.value.trim();
+  const p = pwInput.value;
+  if (!prn || !p) {
+    if (!prn) prnInput.focus(); else pwInput.focus();
+    return;
+  }
+  tryLogin(prn, p);
+});
+[prnInput, pwInput].forEach(el => el.addEventListener('keydown', e => { if (e.key === 'Enter') unlockBtn.click(); }));
+togglePw.addEventListener('click', () => {
+  const isPw = pwInput.type === 'password';
+  pwInput.type = isPw ? 'text' : 'password';
+  eyeOpen.style.display = isPw ? 'none' : '';
+  eyeClosed.style.display = isPw ? '' : 'none';
+});
+
+document.getElementById('lockBtn').addEventListener('click', async () => {
+  await supa.auth.signOut();
+  location.reload();
+});
+
+(async function init() {
+  const { data: { session } } = await supa.auth.getSession();
+  if (session) {
+    CURRENT_USER = session.user;
+    try {
+      CURRENT_PROFILE = await fetchProfile(CURRENT_USER.id);
+      updateUserChip(CURRENT_PROFILE);
+      gate.classList.add('hidden');
+      if (typeof onAuthReady === 'function') onAuthReady(CURRENT_USER, CURRENT_PROFILE);
+    } catch (e) {
+      await supa.auth.signOut();
+      prnInput.focus();
+    }
+  } else {
+    prnInput.focus();
+  }
+})();
+
+
+let DATA = null;
+let map = null;
+let clusterGroup = null;
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function popupHtml(r) {
+  const cls = r.equipment_type === 'SMART RMU' ? 'rmu' : 'oh';
+  const gmapsDir = `https://www.google.com/maps/dir/?api=1&destination=${r.lat},${r.lon}`;
+  return `
+    <div class="pop">
+      <div class="pop-head">
+        <div class="pop-id">
+          <span class="lbl">Equipment №</span>
+          ${escapeHtml(r.equipment_no)}
+        </div>
+        <span class="pop-badge ${cls}"><span class="d"></span>${escapeHtml(r.equipment_type)}</span>
+      </div>
+      <div class="pop-grid">
+        <div class="cell full"><div class="lbl">District</div><div class="val">${escapeHtml(r.district || '—')}</div></div>
+        <div class="cell"><div class="lbl">Zone</div><div class="val">${escapeHtml(r.zone || '—')}</div></div>
+        <div class="cell"><div class="lbl">Vendor</div><div class="val">${escapeHtml(r.vendor || '—')}</div></div>
+        <div class="cell"><div class="lbl">RTU</div><div class="val">${escapeHtml(r.rtu || '—')}</div></div>
+        <div class="cell"><div class="lbl">Modem</div><div class="val">${escapeHtml(r.modem || '—')}</div></div>
+        <div class="cell"><div class="lbl">Lat</div><div class="val coord">${r.lat}</div></div>
+        <div class="cell"><div class="lbl">Lon</div><div class="val coord">${r.lon}</div></div>
+      </div>
+      <a class="pop-btn" href="${gmapsDir}" target="_blank" rel="noopener">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+        Navigate
+      </a>
+    </div>`;
+}
+
+function makeIcon(type) {
+  const cls = type === 'SMART RMU' ? 'rmu' : 'oh';
+  return L.divIcon({
+    className: '',
+    html: `<div class="eq-marker ${cls}"></div>`,
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+    popupAnchor: [0, -8],
+  });
+}
+
+let ICONS = null;
+
+async function fetchAllEquipment() {
+  // Supabase default limit is 1000 rows per request. We need to paginate.
+  const PAGE = 1000;
+  let from = 0;
+  const all = [];
+  while (true) {
+    const { data, error } = await supa
+      .from('equipment')
+      .select('equipment_no, equipment_type, lat, lon, district, vendor, rtu, modem, zone, zone_ar')
+      .range(from, from + PAGE - 1)
+      .order('id', { ascending: true });
+    if (error) throw error;
+    if (!data || data.length === 0) break;
+    all.push(...data);
+    if (data.length < PAGE) break;
+    from += PAGE;
+  }
+  return all;
+}
+
+function buildMap(data) {
+  map = L.map('map', {
+    center: [21.5433, 39.1728],
+    zoom: 11,
+    zoomControl: true,
+    minZoom: 5,
+    maxZoom: 19,
+    preferCanvas: true,
+  });
+
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    attribution: '&copy; OpenStreetMap &copy; CARTO',
+    subdomains: 'abcd',
+    maxZoom: 19,
+  }).addTo(map);
+
+  clusterGroup = L.markerClusterGroup({
+    chunkedLoading: true,
+    chunkInterval: 50,
+    chunkDelay: 10,
+    maxClusterRadius: 60,
+    spiderfyOnMaxZoom: true,
+    showCoverageOnHover: false,
+  });
+
+  applyFilters();
+  map.addLayer(clusterGroup);
+  populateDistricts('');
+}
+
+function populateDistricts(zoneFilter) {
+  const sel = document.getElementById('districtSelect');
+  const currentVal = sel.value;
+  const districts = [...new Set(
+    DATA.filter(r => !zoneFilter || r.zone === zoneFilter).map(r => r.district).filter(Boolean)
+  )].sort();
+  while (sel.options.length > 1) sel.remove(1);
+  for (const d of districts) {
+    const opt = document.createElement('option');
+    opt.value = d; opt.textContent = d;
+    sel.appendChild(opt);
+  }
+  if (currentVal && districts.includes(currentVal)) sel.value = currentVal;
+  else sel.value = '';
+}
+
+function getActiveType() {
+  const active = document.querySelector('.chip.active');
+  return active ? active.dataset.type : 'all';
+}
+
+function applyFilters() {
+  if (!clusterGroup || !DATA) return;
+  const type = getActiveType();
+  const zone = document.getElementById('zoneSelect').value;
+  const district = document.getElementById('districtSelect').value;
+  const search = document.getElementById('searchInput').value.trim().replace(/\.0+$/, '');
+
+  clusterGroup.clearLayers();
+
+  const markers = [];
+  let count = 0;
+  let bounds = null;
+
+  for (const r of DATA) {
+    if (type !== 'all' && r.equipment_type !== type) continue;
+    if (zone && r.zone !== zone) continue;
+    if (district && r.district !== district) continue;
+    if (search && !String(r.equipment_no).includes(search)) continue;
+
+    const m = L.marker([r.lat, r.lon], { icon: ICONS[r.equipment_type] });
+    m.bindPopup(popupHtml(r), { maxWidth: 320 });
+    markers.push(m);
+    if (!bounds) bounds = L.latLngBounds([r.lat, r.lon], [r.lat, r.lon]);
+    else bounds.extend([r.lat, r.lon]);
+    count++;
+  }
+
+  clusterGroup.addLayers(markers);
+  document.getElementById('filterCount').textContent = `${count.toLocaleString()} visible`;
+
+  if ((search || district) && bounds && count > 0 && count < 200) {
+    map.fitBounds(bounds.pad(0.2), { maxZoom: 16 });
+  } else if (count === 0) {
+    document.getElementById('filterCount').textContent = 'No matches';
+  }
+}
+
+function showMapError(msg) {
+  const loader = document.getElementById('mapLoading');
+  loader.innerHTML = `
+    <div style="max-width:380px;text-align:center;padding:0 24px">
+      <div style="font-size:36px;margin-bottom:12px">⚠️</div>
+      <div style="font-size:14px;font-weight:700;color:var(--tert-red);text-transform:uppercase;letter-spacing:0.14em;margin-bottom:10px">Map failed to load</div>
+      <div style="font-size:13px;color:#5a6878;line-height:1.5">${msg}</div>
+    </div>`;
+  loader.classList.remove('gone');
+}
+
+async function onAuthReady(user, profile) {
+  document.getElementById('app').classList.add('ready');
+  if (typeof L === 'undefined' || typeof L.markerClusterGroup !== 'function') {
+    showMapError('Leaflet failed to load. Check your internet connection and refresh.');
+    return;
+  }
+  ICONS = { 'SMART RMU': makeIcon('SMART RMU'), 'SMART OH': makeIcon('SMART OH') };
+
+  try {
+    DATA = await fetchAllEquipment();
+  } catch (e) {
+    showMapError('Failed to load equipment from database: ' + (e.message || e));
+    return;
+  }
+
+  buildMap(DATA);
+
+  document.querySelectorAll('.chip').forEach(c => {
+    c.addEventListener('click', () => {
+      document.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
+      c.classList.add('active');
+      applyFilters();
+    });
+  });
+  document.getElementById('searchInput').addEventListener('input', () => {
+    clearTimeout(window._sd);
+    window._sd = setTimeout(applyFilters, 250);
+  });
+  document.getElementById('zoneSelect').addEventListener('change', () => {
+    populateDistricts(document.getElementById('zoneSelect').value);
+    applyFilters();
+  });
+  document.getElementById('districtSelect').addEventListener('change', applyFilters);
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+    document.querySelector('.chip[data-type="all"]').classList.add('active');
+    document.getElementById('searchInput').value = '';
+    document.getElementById('zoneSelect').value = '';
+    populateDistricts('');
+    document.getElementById('districtSelect').value = '';
+    applyFilters();
+    map.setView([21.5433, 39.1728], 11);
+  });
+
+  const fp = document.getElementById('filterPanel');
+  document.getElementById('filterToggle').addEventListener('click', () => fp.classList.toggle('collapsed'));
+  if (window.matchMedia('(max-width: 760px)').matches) fp.classList.add('collapsed');
+
+  setTimeout(() => document.getElementById('mapLoading').classList.add('gone'), 200);
+}
+
+</script>
+</body>
+</html>
