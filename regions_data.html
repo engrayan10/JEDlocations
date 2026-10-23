@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<title>Regions Data — Saudi Energy</title>
+<style>
+  :root {
+    --extra-dark-blue: #00183A;
+    --dark-blue: #001F5E;
+    --blue: #0027B9;
+    --mid-blue: #0080FF;
+    --light-blue: #32C2FF;
+    --green: #00FF86;
+    --white: #FFFFFF;
+    --tert-red: #E10054;
+    --tert-orange: #EF9B00;
+    --tert-green: #00B476;
+
+    --bg: var(--dark-blue);
+    --bg-deep: var(--extra-dark-blue);
+    --ink: var(--white);
+    --ink-soft: rgba(255, 255, 255, 0.72);
+    --ink-faint: rgba(255, 255, 255, 0.45);
+    --line: rgba(255, 255, 255, 0.12);
+    --line-strong: rgba(255, 255, 255, 0.22);
+    --panel: rgba(255, 255, 255, 0.04);
+    --panel-bright: rgba(255, 255, 255, 0.07);
+
+    --grad-mb-g: linear-gradient(135deg, var(--mid-blue), var(--green));
+    --grad-mb-lb: linear-gradient(135deg, var(--mid-blue), var(--light-blue));
+    --grad-lb-g: linear-gradient(135deg, var(--light-blue), var(--green));
+    --grad-full: linear-gradient(135deg, var(--dark-blue) 0%, var(--blue) 35%, var(--mid-blue) 65%, var(--green) 100%);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { font-family: 'Plus Jakarta Sans', sans-serif; background: var(--bg); color: var(--ink); line-height: 1.5; }
+
+  /* === LOGIN GATE === */
+  .gate {
+    position: fixed; inset: 0; z-index: 1000;
+    display: grid; place-items: center;
+    padding: 24px;
+    background: var(--bg);
+    background-image:
+      radial-gradient(900px 600px at 50% 0%, rgba(0, 128, 255, 0.18), transparent 60%),
+      radial-gradient(700px 500px at 50% 100%, rgba(0, 255, 134, 0.10), transparent 60%);
+    transition: opacity 0.4s ease, visibility 0.4s;
+  }
+  .gate.hidden { opacity: 0; visibility: hidden; pointer-events: none; }
+  .gate-card {
+    width: 100%; max-width: 440px;
+    background: var(--panel-bright);
+    border: 1px solid var(--line);
+    border-radius: 24px;
+    padding: 40px 32px;
+    backdrop-filter: blur(12px);
+    position: relative; overflow: hidden;
+  }
+  .gate-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0;
+    height: 2px; background: var(--grad-full);
+  }
+  .gate-logo { width: 72px; height: 52px; margin: 0 auto 18px; display: block; }
+  .gate h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 6px; text-align: center; }
+  .gate p { font-size: 13px; color: var(--ink-soft); margin-bottom: 28px; text-align: center; }
+  .gate-field { margin-bottom: 12px; }
+  .gate-field label {
+    display: block; font-size: 10px; color: var(--ink-faint);
+    text-transform: uppercase; letter-spacing: 0.16em; font-weight: 700; margin-bottom: 6px;
+  }
+  .gate input {
+    width: 100%; background: rgba(0, 0, 0, 0.3);
+    border: 1.5px solid var(--line-strong); border-radius: 12px;
+    padding: 14px 16px; color: var(--ink);
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-size: 15px; font-weight: 500; height: 50px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+  .gate input::placeholder { color: var(--ink-faint); }
+  .gate input:focus { outline: none; border-color: var(--light-blue); box-shadow: 0 0 0 4px rgba(50, 194, 255, 0.18); }
+  .gate input.error { border-color: var(--tert-red); box-shadow: 0 0 0 4px rgba(225, 0, 84, 0.15); }
+  .gate-input-wrap { position: relative; }
+  .toggle-pw {
+    position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+    background: none; border: none; color: var(--ink-faint);
+    cursor: pointer; padding: 6px;
+    display: flex; align-items: center; justify-content: center; transition: color 0.2s;
+  }
+  .toggle-pw:hover { color: var(--light-blue); }
+  .toggle-pw svg { width: 18px; height: 18px; }
+  .gate-btn {
+    width: 100%; margin-top: 4px;
+    background: var(--grad-mb-g); color: var(--dark-blue);
+    border: none; border-radius: 12px;
+    padding: 0 24px; height: 52px;
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    font-weight: 800; font-size: 14px;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: filter 0.2s, transform 0.1s;
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    box-shadow: 0 8px 24px -10px rgba(0, 255, 134, 0.45);
+  }
+  .gate-btn:hover:not(:disabled) { filter: brightness(1.08); }
+  .gate-btn:active:not(:disabled) { transform: translateY(1px); }
+  .gate-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+  .gate-btn .spinner {
+    width: 18px; height: 18px;
+    border: 2.5px solid rgba(0, 31, 94, 0.3); border-top-color: var(--dark-blue);
+    border-radius: 50%; animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .gate-msg { margin-top: 14px; font-size: 13px; min-height: 18px; color: var(--ink-faint); text-align: center; }
+  .gate-msg.error { color: var(--tert-red); font-weight: 600; }
+  .gate-msg.ok { color: var(--green); font-weight: 600; }
+  .shake { animation: shake 0.4s; }
+  @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-8px); } 75% { transform: translateX(8px); } }
+
+  /* === TOP BAR === */
+  .topbar {
+    position: sticky; top: 0; z-index: 20;
+    background: rgba(0, 24, 58, 0.92); backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--line);
+  }
+  .topbar-inner {
+    max-width: 1180px; margin: 0 auto; padding: 14px 24px;
+    display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  }
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .logo { width: 48px; height: 36px; flex-shrink: 0; }
+  .logo svg { width: 100%; height: 100%; display: block; }
+  .brand-text { line-height: 1.05; }
+  .brand-text .name { font-weight: 800; font-size: 15px; letter-spacing: -0.01em; }
+  .brand-text .sub { font-size: 10px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.16em; margin-top: 4px; font-weight: 600; }
+  .nav-links { display: flex; gap: 4px; }
+  .nav-link { color: var(--ink-soft); text-decoration: none; font-weight: 600; font-size: 13px; padding: 8px 14px; border-radius: 8px; transition: background 0.2s, color 0.2s; white-space: nowrap; }
+  .nav-link:hover { background: var(--panel); color: var(--ink); }
+  .nav-link.active { background: rgba(50, 194, 255, 0.12); color: var(--light-blue); border: 1px solid rgba(50, 194, 255, 0.3); }
+  .nav-link.admin-only { display: none; }
+  .nav-link.admin-only.visible { display: inline-block; }
+  .meta { display: flex; align-items: center; gap: 10px; }
+  .user-chip { display: inline-flex; align-items: center; gap: 8px; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px 6px 6px; font-size: 12px; color: var(--ink-soft); font-weight: 500; }
+  .user-avatar { width: 22px; height: 22px; border-radius: 50%; background: var(--grad-mb-g); color: var(--dark-blue); font-weight: 800; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; }
+  .user-role { font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--light-blue); font-weight: 700; margin-left: 4px; }
+  .user-role.admin { color: var(--green); }
+  .lock-btn { background: none; border: 1px solid var(--line-strong); border-radius: 8px; color: var(--ink-soft); padding: 6px 12px; font-size: 11px; font-weight: 600; cursor: pointer; text-transform: uppercase; letter-spacing: 0.08em; transition: border-color 0.2s, color 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+  .lock-btn:hover { border-color: var(--tert-red); color: var(--tert-red); }
+  .lock-btn svg { width: 12px; height: 12px; }
+
+  .app { display: none; }
+  .app.ready { display: block; }
+  /* Hide gate initially to prevent flash on page-to-page navigation */
+  .gate { opacity: 0; visibility: hidden; }
+  .gate.show { opacity: 1; visibility: visible; }
+
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 48px 28px 80px; }
+  .page-head { margin-bottom: 32px; }
+  .page-head h1 { font-size: clamp(28px, 4vw, 40px); font-weight: 800; letter-spacing: -0.025em; }
+  .page-head h1 .grad { background: var(--grad-mb-g); -webkit-background-clip: text; background-clip: text; color: transparent; font-style: italic; }
+  .page-head p { color: var(--ink-soft); font-size: 14px; margin-top: 10px; max-width: 700px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 32px; }
+  .card { background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); border: 1.5px solid var(--line); border-radius: 16px; padding: 22px; cursor: pointer; transition: transform 0.25s, border-color 0.25s, box-shadow 0.25s; position: relative; overflow: hidden; }
+  .card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; opacity: 0; transition: opacity 0.25s; }
+  .card:hover { transform: translateY(-3px); border-color: rgba(50, 194, 255, 0.4); box-shadow: 0 16px 40px -16px rgba(0, 128, 255, 0.3); }
+  .card:hover::before { opacity: 1; }
+  .card:nth-child(1)::before { background: var(--grad-mb-g); }
+  .card:nth-child(2)::before { background: linear-gradient(90deg, var(--green), var(--light-blue)); }
+  .card:nth-child(3)::before { background: linear-gradient(90deg, #c084fc, var(--light-blue)); }
+  .card:nth-child(4)::before { background: linear-gradient(90deg, #EF9B00, var(--green)); }
+  .card-name { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; margin-bottom: 4px; }
+  .card-count { font-size: 12px; color: var(--ink-faint); font-weight: 600; }
+  .card-desc { font-size: 12px; color: var(--ink-soft); margin-top: 8px; line-height: 1.4; }
+
+  .data-view { display: none; }
+  .data-view.active { display: block; }
+  .data-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 16px; flex-wrap: wrap; }
+  .data-title { font-size: 20px; font-weight: 800; }
+  .data-count { font-size: 12px; color: var(--ink-faint); font-weight: 600; margin-left: 12px; }
+  .back-btn { background: none; border: 1px solid var(--line-strong); border-radius: 10px; color: var(--ink-soft); padding: 8px 16px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 600; font-size: 13px; cursor: pointer; transition: border-color 0.2s, color 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+  .back-btn:hover { border-color: var(--light-blue); color: var(--light-blue); }
+  .back-btn svg { width: 14px; height: 14px; }
+
+  .search-bar { margin-bottom: 16px; position: relative; }
+  .search-bar input { width: 100%; background: rgba(0,0,0,0.25); border: 1.5px solid var(--line-strong); border-radius: 12px; padding: 12px 18px 12px 44px; color: var(--ink); font-family: 'Plus Jakarta Sans', sans-serif; font-size: 14px; font-weight: 500; height: 48px; transition: border-color 0.2s, box-shadow 0.2s; appearance: none; }
+  .search-bar input::placeholder { color: var(--ink-faint); }
+  .search-bar input:focus { outline: none; border-color: var(--light-blue); box-shadow: 0 0 0 3px rgba(50, 194, 255, 0.15); }
+  .search-bar .icon { position: absolute; left: 16px; top: 50%; transform: translateY(-50%); width: 18px; height: 18px; color: var(--ink-faint); pointer-events: none; }
+  .search-count { position: absolute; right: 16px; top: 50%; transform: translateY(-50%); font-size: 11px; color: var(--ink-faint); font-weight: 600; }
+
+  .table-wrap { background: var(--panel-bright); border: 1px solid var(--line); border-radius: 16px; overflow: hidden; }
+  .table-scroll { overflow-x: auto; max-height: 600px; overflow-y: auto; }
+  .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .data-table th { position: sticky; top: 0; background: var(--bg-deep); padding: 12px 16px; text-align: left; font-size: 10px; color: var(--ink-faint); text-transform: uppercase; letter-spacing: 0.12em; font-weight: 700; border-bottom: 1px solid var(--line); white-space: nowrap; z-index: 2; }
+  .data-table td { padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,0.04); white-space: nowrap; max-width: 300px; overflow: hidden; text-overflow: ellipsis; color: var(--ink-soft); }
+  .data-table tr:hover td { background: rgba(255,255,255,0.02); color: var(--ink); }
+  .no-data { padding: 60px 24px; text-align: center; color: var(--ink-faint); font-size: 14px; }
+
+  .footer { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--ink-faint); font-weight: 500; }
+
+  @media (max-width: 760px) {
+    .topbar-inner { padding: 12px 14px; gap: 8px; }
+    .user-chip { display: none !important; }
+    .nav-link { padding: 6px 8px; font-size: 11px; }
+    .brand-text .sub { display: none; }
+    .lock-btn span { display: none; }
+    .lock-btn { padding: 6px 8px; }
+    .wrap { padding: 32px 18px 60px; }
+    .cards { grid-template-columns: 1fr 1fr; gap: 12px; }
+    .data-header { flex-direction: column; align-items: flex-start; }
+  }
+</style>
+</head>
+<body>
+
+<div class="gate" id="gate">
+  <div class="gate-card" id="gateCard">
+    <div style="display:flex;justify-content:center">
+      <div class="gate-logo"><svg viewBox="0 0 56 40" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="logoGradGate" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#0027B9"/>
+      <stop offset="50%" stop-color="#0080FF"/>
+      <stop offset="100%" stop-color="#00FF86"/>
+    </linearGradient>
+  </defs>
+  <path d="M2 26 C 12 26, 16 6, 26 14 C 36 22, 40 26, 54 14"
+        fill="none" stroke="url(#logoGradGate)" stroke-width="3.5" stroke-linecap="round"/>
+  <text x="28" y="38" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif"
+        font-weight="800" font-size="13" fill="#FFFFFF" letter-spacing="-0.5">se</text>
+</svg></div>
+    </div>
+    <h2>Sign In</h2>
+    <p>Enter your PRN and password to access the equipment system.</p>
+    <div class="gate-field">
+      <label for="prn">PRN</label>
+      <input type="text" id="prn" placeholder="e.g. 12345" autocomplete="username" inputmode="numeric" pattern="[0-9]*" />
+    </div>
+    <div class="gate-field">
+      <label for="pw">Password</label>
+      <div class="gate-input-wrap">
+        <input type="password" id="pw" placeholder="••••••••" autocomplete="current-password" />
+        <button type="button" class="toggle-pw" id="togglePw" aria-label="Show password">
+          <svg id="eyeOpen" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg id="eyeClosed" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><path d="M9.88 9.88a3 3 0 1 0 4.24 4.24"/><path d="M10.73 5.08A10.43 10.43 0 0 1 12 5c7 0 10 7 10 7a13.16 13.16 0 0 1-1.67 2.68"/><path d="M6.61 6.61A13.526 13.526 0 0 0 2 12s3 7 10 7a9.74 9.74 0 0 0 5.39-1.61"/><line x1="2" y1="2" x2="22" y2="22"/></svg>
+        </button>
+      </div>
+    </div>
+    <button class="gate-btn" id="unlockBtn">
+      <span id="unlockTxt">Sign In</span>
+    </button>
+    <div class="gate-msg" id="gateMsg">&nbsp;</div>
+  </div>
+</div>
+
+<div class="app" id="app">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="brand" href="index.html" style="text-decoration:none;color:inherit">
+        <div class="logo"><svg viewBox="0 0 56 40" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="logoGradTop" x1="0%" y1="50%" x2="100%" y2="50%">
+      <stop offset="0%" stop-color="#0027B9"/>
+      <stop offset="50%" stop-color="#0080FF"/>
+      <stop offset="100%" stop-color="#00FF86"/>
+    </linearGradient>
+  </defs>
+  <path d="M2 26 C 12 26, 16 6, 26 14 C 36 22, 40 26, 54 14"
+        fill="none" stroke="url(#logoGradTop)" stroke-width="3.5" stroke-linecap="round"/>
+  <text x="28" y="38" text-anchor="middle" font-family="Plus Jakarta Sans, sans-serif"
+        font-weight="800" font-size="13" fill="#FFFFFF" letter-spacing="-0.5">se</text>
+</svg></div>
+        <div class="brand-text">
+          <div class="name">Saudi Energy</div>
+          <div class="sub">Equipment Locator</div>
+        </div>
+      </a>
+      <nav class="nav-links">
+        <a class="nav-link" href="index.html">Home</a>
+        <a class="nav-link " href="equipment_locator.html">EQ Locator</a>
+        <a class="nav-link " href="map_view.html">Map View</a>
+        <a class="nav-link admin-only " href="user_management.html" id="adminLink">Users</a>
+        <a class="nav-link admin-only" href="stations.html" id="stationsLink">Stations</a>
+        <a class="nav-link " href="stations_data.html">Stations Data</a>
+        <a class="nav-link active" href="regions_data.html">Regions</a>
+      </nav>
+      <div class="meta">
+        <span class="user-chip" id="userChip" style="display:none">
+          <span class="user-avatar" id="userAvatar">?</span>
+          <span id="userPrn">—</span>
+          <span class="user-role" id="userRole">agent</span>
+        </span>
+        <button class="lock-btn" id="lockBtn" title="Sign out">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span>Sign out</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="page-head">
+      <h1>Regions <span class="grad">Data</span></h1>
+      <p>SCADA telecom signal routing data for Jeddah, Makkah, Madinah, and Taif regions. Select a region below to view its data.</p>
+    </div>
+
+    <section id="cardsSection">
+      <div class="cards">
+        <div class="card" data-region="Jeddah">
+          <div class="card-name">JED</div>
+          <div class="card-count" id="count-Jeddah">— rows</div>
+          <div class="card-desc">Jeddah region — substation signal routing, cabinets, equipment cards and ports</div>
+        </div>
+        <div class="card" data-region="Makkah">
+          <div class="card-name">MAK</div>
+          <div class="card-count" id="count-Makkah">— rows</div>
+          <div class="card-desc">Makkah region — substation signal routing, cabinets, equipment cards and ports</div>
+        </div>
+        <div class="card" data-region="Madinah">
+          <div class="card-name">MED</div>
+          <div class="card-count" id="count-Madinah">— rows</div>
+          <div class="card-desc">Madinah region — substation signal routing, cabinets, equipment cards and ports</div>
+        </div>
+        <div class="card" data-region="Taif">
+          <div class="card-name">TIF</div>
+          <div class="card-count" id="count-Taif">— rows</div>
+          <div class="card-desc">Taif region — substation signal routing, cabinets, equipment cards and ports</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="data-view" id="dataView">
+      <div class="data-header">
+        <div style="display:flex;align-items:baseline;gap:4px">
+          <span class="data-title" id="dataTitle">—</span>
+          <span class="data-count" id="dataCountBadge">—</span>
+        </div>
+        <button class="back-btn" id="backBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+          Back
+        </button>
+      </div>
+      <div class="search-bar">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="searchInput" placeholder="Search across all columns…" autocomplete="off"/>
+        <span class="search-count" id="searchCount"></span>
+      </div>
+      <div class="table-wrap">
+        <div class="table-scroll">
+          <table class="data-table">
+            <thead><tr id="dataHead"></tr></thead>
+            <tbody id="dataBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer">
+      <span>Made by Eng: Rayan Alharbi</span>
+      <span>Saudi Energy · Western Operating Area</span>
+    </div>
+  </main>
+</div>
+
+<script>
+const SUPABASE_URL = "https://spjaqkvdiazfeotylxny.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNwamFxa3ZkaWF6ZmVvdHlseG55Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE4MDIwMjcsImV4cCI6MjA5NzM3ODAyN30.i9Z5olz6dAa1KxLp9V0OgSsYd3XVawoyURj_3VjpIJw";
+const EMAIL_DOMAIN = "saudienergy.local";
+const supa = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+let CURRENT_USER = null;
+let CURRENT_PROFILE = null;
+
+const gate = document.getElementById('gate');
+const gateCard = document.getElementById('gateCard');
+const prnInput = document.getElementById('prn');
+const pwInput = document.getElementById('pw');
+const unlockBtn = document.getElementById('unlockBtn');
+const unlockTxt = document.getElementById('unlockTxt');
+const gateMsg = document.getElementById('gateMsg');
+const togglePw = document.getElementById('togglePw');
+const eyeOpen = document.getElementById('eyeOpen');
+const eyeClosed = document.getElementById('eyeClosed');
+
+function prnToEmail(prn) { return `prn-${prn}@${EMAIL_DOMAIN}`; }
+
+async function fetchProfile(userId) {
+  const { data, error } = await supa.from('profiles').select('id, prn, email, full_name, role').eq('id', userId).single();
+  if (error) throw error;
+  return data;
+}
+
+function updateUserChip(profile) {
+  const chip = document.getElementById('userChip');
+  if (!chip) return;
+  chip.style.display = 'inline-flex';
+  document.getElementById('userPrn').textContent = profile.prn || profile.full_name || 'User';
+  const initial = (profile.full_name || profile.prn || '?').charAt(0).toUpperCase();
+  document.getElementById('userAvatar').textContent = initial;
+  const roleEl = document.getElementById('userRole');
+  roleEl.textContent = profile.role === 'super_admin' ? 'admin' : 'agent';
+  roleEl.classList.toggle('admin', profile.role === 'super_admin');
+  const adminLink = document.getElementById('adminLink');
+  if (adminLink && profile.role === 'super_admin') adminLink.classList.add('visible');
+  const stationsLink = document.getElementById('stationsLink');
+  if (stationsLink && profile.role === 'super_admin') stationsLink.classList.add('visible');
+}
+
+async function tryLogin(prn, password) {
+  unlockBtn.disabled = true;
+  unlockTxt.innerHTML = '<span class="spinner"></span>';
+  gateMsg.classList.remove('error', 'ok');
+  gateMsg.textContent = 'Signing in…';
+  pwInput.classList.remove('error');
+  prnInput.classList.remove('error');
+  try {
+    if (!/^[0-9]+$/.test(prn)) throw new Error('PRN must be digits only');
+    const email = prnToEmail(prn);
+    const { data, error } = await supa.auth.signInWithPassword({ email, password });
+    if (error) throw new Error(error.message.toLowerCase().includes('invalid') ? 'Incorrect PRN or password' : error.message);
+    CURRENT_USER = data.user;
+    CURRENT_PROFILE = await fetchProfile(CURRENT_USER.id);
+    updateUserChip(CURRENT_PROFILE);
+    gateMsg.classList.add('ok');
+    gateMsg.textContent = 'Signed in';
+    setTimeout(() => {
+      gate.classList.add('hidden');
+      pwInput.value = '';
+      if (typeof onAuthReady === 'function') onAuthReady(CURRENT_USER, CURRENT_PROFILE);
+    }, 250);
+  } catch (err) {
+    gateMsg.classList.add('error');
+    gateMsg.textContent = err.message || 'Sign in failed';
+    pwInput.classList.add('error');
+    prnInput.classList.add('error');
+    gateCard.classList.remove('shake'); void gateCard.offsetWidth; gateCard.classList.add('shake');
+    unlockBtn.disabled = false;
+    unlockTxt.textContent = 'Sign In';
+    pwInput.focus(); pwInput.select();
+  }
+}
+
+unlockBtn.addEventListener('click', () => {
+  const prn = prnInput.value.trim();
+  const p = pwInput.value;
+  if (!prn || !p) { if (!prn) prnInput.focus(); else pwInput.focus(); return; }
+  tryLogin(prn, p);
+});
+[prnInput, pwInput].forEach(el => el.addEventListener('keydown', e => { if (e.key === 'Enter') unlockBtn.click(); }));
+togglePw.addEventListener('click', () => {
+  const isPw = pwInput.type === 'password';
+  pwInput.type = isPw ? 'text' : 'password';
+  eyeOpen.style.display = isPw ? 'none' : '';
+  eyeClosed.style.display = isPw ? '' : 'none';
+});
+
+document.getElementById('lockBtn').addEventListener('click', async () => {
+  await supa.auth.signOut();
+  location.reload();
+});
+
+(async function init() {
+  const { data: { session } } = await supa.auth.getSession();
+  if (session) {
+    CURRENT_USER = session.user;
+    try {
+      CURRENT_PROFILE = await fetchProfile(CURRENT_USER.id);
+      updateUserChip(CURRENT_PROFILE);
+      gate.classList.add('hidden');
+      if (typeof onAuthReady === 'function') onAuthReady(CURRENT_USER, CURRENT_PROFILE);
+    } catch (e) {
+      await supa.auth.signOut();
+      gate.classList.add('show');
+      prnInput.focus();
+    }
+  } else {
+    gate.classList.add('show');
+    prnInput.focus();
+  }
+})();
+
+/* ── Regions Data Logic ── */
+const COLUMNS = [
+  'substation','route','source_cabinet','source_equipment_card','source_slot','source_port_ch',
+  'intermediate_location','intermediate_cabinet','intermediate_equipment_card','intermediate_slot','intermediate_port',
+  'destination_control_center','destination_cabinet','destination_equipment_card','destination_slot','destination_port'
+];
+const HEADERS = [
+  'Substation','Route','Src Cabinet','Src Equip Card','Src Slot','Src Port/Ch',
+  'Inter. Location','Inter. Cabinet','Inter. Equip Card','Inter. Slot','Inter. Port',
+  'Dest. Control Center','Dest. Cabinet','Dest. Equip Card','Dest. Slot','Dest. Port'
+];
+
+const REGIONS = ['Jeddah','Makkah','Madinah','Taif'];
+let currentRegion = null, currentData = null;
+
+function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function loadRegion(region) {
+  currentRegion = region;
+  document.getElementById('cardsSection').style.display = 'none';
+  document.getElementById('dataView').classList.add('active');
+  document.getElementById('dataTitle').textContent = region + ' Region';
+  document.getElementById('searchInput').value = '';
+  const tbody = document.getElementById('dataBody');
+  tbody.innerHTML = '<tr><td colspan="' + COLUMNS.length + '" class="no-data">Loading…</td></tr>';
+  document.getElementById('dataHead').innerHTML = HEADERS.map(h => `<th>${escapeHtml(h)}</th>`).join('');
+  try {
+    const all = []; let from = 0;
+    while (true) {
+      const { data, error } = await supa.from('regions_stdata').select('*').eq('region', region).range(from, from + 999).order('id');
+      if (error) throw error;
+      if (!data || !data.length) break;
+      all.push(...data);
+      if (data.length < 1000) break;
+      from += 1000;
+    }
+    currentData = all;
+    document.getElementById('dataCountBadge').textContent = `${all.length} rows`;
+    renderRows(all);
+  } catch (e) { tbody.innerHTML = `<tr><td colspan="${COLUMNS.length}" class="no-data">Error: ${escapeHtml(e.message)}</td></tr>`; }
+}
+
+function renderRows(rows) {
+  const tbody = document.getElementById('dataBody');
+  if (!rows.length) { tbody.innerHTML = `<tr><td colspan="${COLUMNS.length}" class="no-data">No matching rows</td></tr>`; document.getElementById('searchCount').textContent = '0'; return; }
+  const display = rows.slice(0, 500);
+  tbody.innerHTML = display.map(r =>
+    '<tr>' + COLUMNS.map(c => `<td title="${escapeHtml(r[c])}">${escapeHtml(r[c] || '—')}</td>`).join('') + '</tr>'
+  ).join('');
+  document.getElementById('searchCount').textContent = rows.length > 500 ? `${rows.length} (showing 500)` : String(rows.length);
+}
+
+document.getElementById('searchInput').addEventListener('input', function() {
+  if (!currentData) return;
+  const q = this.value.trim().toLowerCase();
+  if (!q) { renderRows(currentData); return; }
+  const filtered = currentData.filter(r => COLUMNS.some(c => String(r[c]||'').toLowerCase().includes(q)));
+  renderRows(filtered);
+});
+
+document.getElementById('backBtn').addEventListener('click', () => {
+  document.getElementById('dataView').classList.remove('active');
+  document.getElementById('cardsSection').style.display = '';
+  currentRegion = null; currentData = null;
+});
+
+document.querySelectorAll('.card[data-region]').forEach(card => {
+  card.addEventListener('click', () => loadRegion(card.dataset.region));
+});
+
+function onAuthReady(user, profile) {
+  document.getElementById('app').classList.add('ready');
+  // Load counts for each region
+  REGIONS.forEach(async (region) => {
+    try {
+      const { count, error } = await supa.from('regions_stdata').select('*', { count: 'exact', head: true }).eq('region', region);
+      if (!error && count !== null) {
+        const el = document.getElementById('count-' + region);
+        if (el) el.textContent = count + ' rows';
+      }
+    } catch (e) { /* ignore */ }
+  });
+}
+</script>
+</body>
+</html>
